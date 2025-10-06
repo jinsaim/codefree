@@ -31,7 +31,7 @@
 		/* Numeric group selected -> 4 columns per row */
 		.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 		/* Row of 4 cards + explanation to the right */
-		.quad-row { display: grid; grid-template-columns: repeat(4, 0.25fr) 1fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
+		.quad-row { display: grid; grid-template-columns: repeat(4, 0.25fr) 2fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
 		.row-explain { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
 		@media (max-width: 640px) { .quad-row { grid-template-columns: repeat(2, 1fr); } .row-explain { grid-column: 1 / -1; } }
 		.card { background: #0b1220; border: 1px solid #1f2937; border-radius: .75rem; padding: .75rem; text-align: center; transition: transform .12s ease, border-color .12s ease; }
