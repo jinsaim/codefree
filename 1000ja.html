@@ -194,9 +194,7 @@
 		];
 
 		const LS_KEY = 'thousandChars_v1';
-		const NOTES_KEY = 'thousandChars_groupExtras_v1';
 		let data = [];
-		let groupExtras = {};
 
 		function loadData() {
 			try {
@@ -209,15 +207,6 @@
 		}
 
 		function saveData() { try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (e) { console.warn('저장 실패', e); } }
-
-		function loadExtras(){
-			try {
-				const raw = localStorage.getItem(NOTES_KEY);
-				groupExtras = raw ? JSON.parse(raw) : {};
-				if (typeof groupExtras !== 'object' || Array.isArray(groupExtras) || !groupExtras) groupExtras = {};
-			} catch (e) { console.warn('메모 불러오기 실패', e); groupExtras = {}; }
-		}
-		function saveExtras(){ try { localStorage.setItem(NOTES_KEY, JSON.stringify(groupExtras)); } catch (e) { console.warn('메모 저장 실패', e); } }
 
 		function setMode(mode) {
 			document.querySelectorAll('.mode').forEach(el => el.classList.remove('active'));
@@ -260,10 +249,7 @@
 						</div>`;
 					}).join('');
 					const base = groupExplanations[g] || '';
-					const extras = Array.isArray(groupExtras[g]) ? groupExtras[g] : [];
-					const extrasHtml = extras.map(t => `<div>${t}</div>`).join('');
-					const actionsHtml = `<div style="margin-top:.4rem;"><button class="btn note-add" data-group="${g}">추가</button></div>`;
-					return `<div class="quad-row">${cards}<div class="row-explain">${base ? `<div>${base}</div>` : ''}${extrasHtml}${actionsHtml}</div></div>`;
+					return `<div class="quad-row">${cards}<div class="row-explain">${base}</div></div>`;
 				}).join('');
 				el.innerHTML = rowsHtml;
 				document.getElementById('countInfo').textContent = `${currentList.length}자`;
@@ -405,9 +391,8 @@
 		function doReset() { if (confirm('저장된 학습 데이터를 초기화할까요?')) { localStorage.removeItem(LS_KEY); loadData(); renderLearn(); startQuiz(); } }
 
 		// 이벤트 바인딩
-		document.addEventListener('DOMContentLoaded', () => {
+			document.addEventListener('DOMContentLoaded', () => {
 			loadData();
-			loadExtras();
 			renderLearn();
 			rebuildGroupFilter();
 			startQuiz();
@@ -474,18 +459,6 @@
 			}
 
 			learnGrid.addEventListener('click', (ev) => {
-				const addBtn = ev.target.closest('.note-add');
-				if (addBtn) {
-					const g = addBtn.getAttribute('data-group');
-					const text = prompt('추가할 문구를 입력하세요');
-					if (text && text.trim()) {
-						if (!Array.isArray(groupExtras[g])) groupExtras[g] = [];
-						groupExtras[g].push(text.trim());
-						saveExtras();
-						doSearch();
-					}
-					return;
-				}
 				const card = ev.target.closest('.card');
 				if (!card) return;
 				const idx = Number(card.getAttribute('data-idx'));
