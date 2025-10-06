@@ -26,8 +26,14 @@
 		.toolbar button.primary { background: var(--accent); color: #052e13; border-color: transparent; font-weight: 600; }
 		.toolbar label.lbl { color: var(--muted); font-size: .9rem; margin-left: .25rem; }
 		.grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+		/* Switch to block list when rendering per-row layout */
+		.grid.rows-mode { display: block; }
 		/* Numeric group selected -> 4 columns per row */
 		.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+		/* Row of 4 cards + explanation to the right */
+		.quad-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 1.8fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
+		.row-explain { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
+		@media (max-width: 640px) { .quad-row { grid-template-columns: repeat(2, 1fr); } .row-explain { grid-column: 1 / -1; } }
 		.card { background: #0b1220; border: 1px solid #1f2937; border-radius: .75rem; padding: .75rem; text-align: center; transition: transform .12s ease, border-color .12s ease; }
 		.card:hover { transform: translateY(-2px); border-color: #334155; }
 		.hanja { font-size: 28px; line-height: 1.2; }
@@ -209,14 +215,57 @@
 
 		function renderLearn(list) {
 			const el = document.getElementById('learnGrid');
-			el.innerHTML = (list || data).map((x, i) => `
-				<div class="card" data-idx="${i}">
+			const currentList = (list || data);
+			const grpVal = (document.getElementById('groupFilter')?.value || '').trim();
+			const queryVal = (document.getElementById('search')?.value || '').trim();
+			const matchNum = grpVal.match(/^0*(\d+)$/);
+
+			// If numeric group selected and no query, render rows of 4 + explanation
+			if (matchNum && !queryVal) {
+				// Group explanations (extend as needed)
+				const groupExplanations = {
+					'001': '하늘은 거뭇거뭇하고 땅은 누리끼리하다.',
+				};
+				// Build map group -> items
+				const byGroup = new Map();
+				currentList.forEach((x) => {
+					const g = x.group || '';
+					if (!byGroup.has(g)) byGroup.set(g, []);
+					byGroup.get(g).push(x);
+				});
+				// Sort groups numerically ascending
+				const groupKeys = Array.from(byGroup.keys()).sort((a, b) => Number(a) - Number(b));
+				// Compose rows
+				const rowsHtml = groupKeys.map(g => {
+					const items = byGroup.get(g).slice(0, 4); // ensure 4 max
+					const cards = items.map(it => {
+						const idxGlobal = data.indexOf(it);
+						return `
+						<div class="card" data-idx="${idxGlobal}">
+							<div class="hanja">${it.ch}</div>
+							<div class="hangeul">${it.read}</div>
+							<div class="meta">${it.mean || ''}</div>
+						</div>`;
+					}).join('');
+					const explain = groupExplanations[g] || '';
+					return `<div class="quad-row">${cards}<div class="row-explain">${explain}</div></div>`;
+				}).join('');
+				el.innerHTML = rowsHtml;
+				document.getElementById('countInfo').textContent = `${currentList.length}자`;
+				return;
+			}
+
+			// Default: flat card grid
+			el.innerHTML = currentList.map((x) => {
+				const idxGlobal = data.indexOf(x);
+				return `
+				<div class="card" data-idx="${idxGlobal}">
 					<div class="hanja">${x.ch}</div>
 					<div class="hangeul">${x.read}</div>
 					<div class="meta">${x.mean || ''}</div>
-				</div>
-			`).join('');
-			document.getElementById('countInfo').textContent = `${(list || data).length}자`;
+				</div>`;
+			}).join('');
+			document.getElementById('countInfo').textContent = `${currentList.length}자`;
 		}
 
 		function shuffle(arr) {
@@ -245,13 +294,17 @@
 					const gx = parseGroupNum(x.group);
 					return gx !== null && gx <= selectedNum;
 				});
-				// 4 columns for numeric group view
-				learnGridEl.classList.add('cols-4');
+				// Use rows-mode to render per-group rows with explanations
+				if (!q) {
+					learnGridEl.classList.add('rows-mode');
+				} else {
+					learnGridEl.classList.remove('rows-mode');
+				}
 			} else {
 				// Equality filter for non-numeric groups (e.g., 'custom')
 				if (grp) list = list.filter(x => (x.group || '') === grp);
-				// Back to default columns
-				learnGridEl.classList.remove('cols-4');
+				// Back to default grid
+				learnGridEl.classList.remove('rows-mode');
 			}
 
 			if (q) {
