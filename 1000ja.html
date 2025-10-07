@@ -91,6 +91,7 @@
 			<button id="shuffleBtn">섞기</button>
 			<button id="resetBtn">초기화</button>
 			<button id="exportBtn">백업</button>
+			<button id="viewJsonBtn">JSON 보기</button>
 			<input id="importFile" type="file" accept="application/json" style="display:none" />
 			<button id="importBtn">가져오기</button>
 			<button id="bulkBtn" class="primary" title="천자문 전체를 빠르게 붙여넣기로 등록">전체 붙여넣기</button>
@@ -460,18 +461,27 @@
 
 		// 백업/가져오기
 		function doExport() {
-			const blob = new Blob([JSON.stringify({ items: data, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json;charset=utf-8' });
+			const blob = new Blob([JSON.stringify({ key: LS_KEY, items: data, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json;charset=utf-8' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
-			a.href = url; a.download = '1000ja-backup.json'; a.click();
+			a.href = url; a.download = 'thousandChars_v1.json'; a.click();
 			setTimeout(() => URL.revokeObjectURL(url), 500);
+		}
+
+		function viewJson(){
+			const payload = { key: LS_KEY, items: data, exportedAt: new Date().toISOString() };
+			const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+			const url = URL.createObjectURL(blob);
+			window.open(url, '_blank');
+			setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
 		}
 		function doImport(file) {
 			const reader = new FileReader();
 			reader.onload = () => {
 				try {
 					const json = JSON.parse(reader.result);
-					const items = json.items || json.data || json || [];
+					// Accept either an array of items or an object with { key, items }
+					const items = Array.isArray(json) ? json : (json.items || json.data || []);
 					if (!Array.isArray(items)) throw new Error('잘못된 형식');
 					// 기본 키 정규화
 					data = items.map(x => ({ ch: x.ch || x.char || x.hanja, read: x.read || x.kor || x.ko || '', mean: x.mean || x.desc || '', group: x.group || x.grp || 'import' })).filter(x => x.ch && x.read);
@@ -501,6 +511,7 @@
 			document.getElementById('shuffleBtn').addEventListener('click', () => { data = shuffle(data); saveData(); renderLearn(); startQuiz(); });
 			document.getElementById('resetBtn').addEventListener('click', doReset);
 			document.getElementById('exportBtn').addEventListener('click', doExport);
+			document.getElementById('viewJsonBtn').addEventListener('click', viewJson);
 			document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
 			document.getElementById('importFile').addEventListener('change', (e) => { if (e.target.files[0]) { doImport(e.target.files[0]); setTimeout(() => { rebuildGroupFilter(); doSearch(); }, 100); } });
 
