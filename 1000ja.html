@@ -450,10 +450,17 @@
 		}
 		function checkQuiz() {
 			const q = quizList[quizIndex % quizList.length];
-			const a = document.getElementById('quizAnswer').value.trim();
-			const ok = a && (a === q.read || (q.mean && a === q.mean));
+			const raw = document.getElementById('quizAnswer').value;
+			const norm = (s) => (s || '').toString().trim().replace(/\s+/g, ' ');
+			const a = norm(raw);
+			const read = norm(q.read);
+			const mean = norm(q.mean || '');
+			// Accept: read, mean, or "mean read" (ex: "하늘 천")
+			const combos = [];
+			if (mean && read) combos.push(`${mean} ${read}`);
+			const ok = a && (a === read || (mean && a === mean) || combos.includes(a));
 			const r = document.getElementById('quizResult');
-			r.textContent = ok ? `정답! (${q.read}${q.mean ? ' / ' + q.mean : ''})` : `오답: ${q.read}${q.mean ? ' / ' + q.mean : ''}`;
+			r.textContent = ok ? `정답! (${mean ? mean + ' ' : ''}${read})` : `오답: ${mean ? mean + ' ' : ''}${read}`;
 			r.className = 'result ' + (ok ? 'ok' : 'bad');
 		}
 
