@@ -372,19 +372,11 @@
 		}
 		function buildPracticeList(){
 			const grp = document.getElementById('groupFilter').value;
-			if (!grp) { practiceList = data.slice(0, 16); } // default: first few
-			else {
-				// If numeric, include all <= selected, else exact group
-				const m = String(grp).match(/^0*(\d+)$/);
-				if (m) {
-					const upTo = parseInt(m[1], 10);
-					practiceList = data.filter(x => {
-						const mm = String(x.group||'').match(/^0*(\d+)$/);
-						return mm && parseInt(mm[1],10) <= upTo;
-					});
-				} else {
-					practiceList = data.filter(x => (x.group||'') === grp);
-				}
+			if (!grp) {
+				practiceList = data.slice(0, 16); // default: first few
+			} else {
+				// In write mode: practice only the selected group (e.g., 002 → that group's 4 chars)
+				practiceList = data.filter(x => (x.group || '') === grp).slice(0, 4);
 			}
 			practiceIdx = 0;
 			updatePracticeUI();
@@ -429,7 +421,24 @@
 		// 퀴즈
 		let quizIndex = 0;
 		let quizList = [];
-		function startQuiz() { quizList = shuffle(data); quizIndex = 0; showQuiz(); }
+		function startQuiz() {
+			// Build quiz list similar to learn-mode cumulative behavior by group
+			const grp = document.getElementById('groupFilter').value;
+			let list = data;
+			const m = String(grp || '').match(/^0*(\d+)$/);
+			if (m) {
+				const upTo = parseInt(m[1], 10);
+				list = data.filter(x => {
+					const mm = String(x.group || '').match(/^0*(\d+)$/);
+					return mm && parseInt(mm[1], 10) <= upTo;
+				});
+			} else if (grp) {
+				list = data.filter(x => (x.group || '') === grp);
+			}
+			quizList = shuffle(list.length ? list : data);
+			quizIndex = 0;
+			showQuiz();
+		}
 		function showQuiz() {
 			if (!quizList.length) { startQuiz(); return; }
 			const q = quizList[quizIndex % quizList.length];
@@ -488,7 +497,7 @@
 
 			document.getElementById('modeSelect').addEventListener('change', (e) => setMode(e.target.value));
 			document.getElementById('search').addEventListener('input', doSearch);
-			document.getElementById('groupFilter').addEventListener('change', () => { doSearch(); buildPracticeList(); });
+			document.getElementById('groupFilter').addEventListener('change', () => { doSearch(); buildPracticeList(); startQuiz(); });
 			document.getElementById('shuffleBtn').addEventListener('click', () => { data = shuffle(data); saveData(); renderLearn(); startQuiz(); });
 			document.getElementById('resetBtn').addEventListener('click', doReset);
 			document.getElementById('exportBtn').addEventListener('click', doExport);
