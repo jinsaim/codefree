@@ -89,7 +89,6 @@
 			<select id="groupFilter" title="묶음 선택">
 				<option value="">전체 묶음</option>
 			</select>
-			<button id="shuffleBtn">섞기</button>
 			<button id="resetBtn">초기화</button>
 			<button id="exportBtn">백업</button>
 			<button id="viewJsonBtn">JSON 보기</button>
@@ -190,6 +189,7 @@
 		];
 
 		const LS_KEY = 'thousandChars_v1';
+		const LS_LAST_IMPORT_KEY = 'thousandChars_lastImport';
 		let data = [];
 
 		function loadData() {
@@ -533,6 +533,7 @@
 						})).filter(x => x.ch && (x.read || x.mean));
 						if (!norm.length) throw new Error('엑셀/CSV에서 유효한 데이터가 없습니다. (열: 한자, 음/훈, 뜻, 묶음)');
 						data = norm;
+						try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
 						saveData();
 						renderLearn();
 						rebuildGroupFilter();
@@ -554,6 +555,7 @@
 					if (!Array.isArray(items)) throw new Error('잘못된 형식');
 					// 기본 키 정규화
 					data = items.map(x => ({ ch: x.ch || x.char || x.hanja, read: x.read || x.kor || x.ko || '', mean: x.mean || x.desc || '', group: x.group || x.grp || 'import' })).filter(x => x.ch && x.read);
+					try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
 					saveData();
 					renderLearn();
 					rebuildGroupFilter();
@@ -566,7 +568,25 @@
 		}
 
 		// 초기화
-		function doReset() { if (confirm('저장된 학습 데이터를 초기화할까요?')) { localStorage.removeItem(LS_KEY); loadData(); renderLearn(); startQuiz(); } }
+		function doReset() {
+			if (!confirm('가장 최근 가져오기한 내용으로 초기화할까요?')) return;
+			try {
+				const last = localStorage.getItem(LS_LAST_IMPORT_KEY);
+				if (last) {
+					data = JSON.parse(last);
+				} else {
+					// fallback: seed
+					data = seed;
+				}
+				saveData();
+				renderLearn();
+				rebuildGroupFilter();
+				startQuiz();
+				alert(`초기화 완료: ${data.length}자`);
+			} catch (e) {
+				alert('초기화 실패: ' + e.message);
+			}
+		}
 
 		// 이벤트 바인딩
 			document.addEventListener('DOMContentLoaded', () => {
@@ -578,7 +598,6 @@
 			document.getElementById('modeSelect').addEventListener('change', (e) => setMode(e.target.value));
 			document.getElementById('search').addEventListener('input', doSearch);
 			document.getElementById('groupFilter').addEventListener('change', () => { doSearch(); buildPracticeList(); startQuiz(); });
-			document.getElementById('shuffleBtn').addEventListener('click', () => { data = shuffle(data); saveData(); renderLearn(); startQuiz(); });
 			document.getElementById('resetBtn').addEventListener('click', doReset);
 			document.getElementById('exportBtn').addEventListener('click', doExport);
 			document.getElementById('viewJsonBtn').addEventListener('click', viewJson);
@@ -685,6 +704,7 @@
 				const toAdd = built.filter(x => !existingSet.has(x.ch));
 				data = data.concat(toAdd);
 			}
+			try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
 			saveData();
 			rebuildGroupFilter();
 			doSearch();
