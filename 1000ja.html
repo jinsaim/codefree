@@ -107,7 +107,7 @@
 		<!-- 퀴즈 모드 -->
 		<section id="mode-quiz" class="mode">
 			<div class="panel quiz">
-				<div class="hint">한자를 보고 음(훈)을 쓰세요</div>
+				<div class="hint">한자를 보고 뜻과 음(예: 하늘 천)을 쓰세요</div>
 				<div class="question" id="quizQuestion">天</div>
 				<input id="quizAnswer" type="text" placeholder="정답 입력" />
 				<div>
@@ -324,6 +324,7 @@
 		let practiceList = [];
 		let practiceIdx = 0;
 		let practiceWriter = null;
+		let practiceHistory = [];
 		// Initialize a freehand drawing canvas inside #practiceTarget
 		function initFreehandCanvas(){
 			const target = document.getElementById('practiceTarget');
@@ -374,13 +375,36 @@
 		}
 		function buildPracticeList(){
 			const grp = document.getElementById('groupFilter').value;
-			if (!grp) {
-				practiceList = data.slice(0, 16); // default: first few
+			// Match quiz-mode behavior: numeric group = cumulative, else exact group, empty = all
+			const m = String(grp || '').match(/^0*(\d+)$/);
+			if (m) {
+				const upTo = parseInt(m[1], 10);
+				practiceList = data.filter(x => {
+					const mm = String(x.group || '').match(/^0*(\d+)$/);
+					return mm && parseInt(mm[1], 10) <= upTo;
+				});
+			} else if (grp) {
+				practiceList = data.filter(x => (x.group || '') === grp);
 			} else {
-				// In write mode: practice only the selected group (e.g., 002 → that group's 4 chars)
-				practiceList = data.filter(x => (x.group || '') === grp).slice(0, 4);
+				practiceList = data.slice();
 			}
-			practiceIdx = 0;
+			// Initialize a random starting index and history
+			practiceHistory = [];
+			setPracticeIdxRandom(true);
+		}
+
+		function setPracticeIdxRandom(pushHistory){
+			if (!practiceList.length) { practiceIdx = 0; updatePracticeUI(); return; }
+			let newIdx = practiceIdx;
+			if (practiceList.length === 1) {
+				newIdx = 0;
+			} else {
+				// Avoid immediate repetition if possible
+				do { newIdx = Math.floor(Math.random() * practiceList.length); }
+				while (newIdx === practiceIdx);
+			}
+			practiceIdx = newIdx;
+			if (pushHistory) practiceHistory.push(practiceIdx);
 			updatePracticeUI();
 		}
 
@@ -626,8 +650,17 @@
 			strokeModal.addEventListener('click', (e) => { if (e.target === strokeModal) closeStroke(); });
 
 			// practice control events
-			document.getElementById('pPrev').addEventListener('click', () => { if (practiceList.length) { practiceIdx = (practiceIdx - 1 + practiceList.length) % practiceList.length; updatePracticeUI(); }});
-			document.getElementById('pNext').addEventListener('click', () => { if (practiceList.length) { practiceIdx = (practiceIdx + 1) % practiceList.length; updatePracticeUI(); }});
+			document.getElementById('pPrev').addEventListener('click', () => {
+				if (!practiceList.length) return;
+				if (practiceHistory.length > 1) {
+					practiceHistory.pop();
+					practiceIdx = practiceHistory[practiceHistory.length - 1];
+					updatePracticeUI();
+				} else {
+					updatePracticeUI();
+				}
+			});
+			document.getElementById('pNext').addEventListener('click', () => { if (practiceList.length) { setPracticeIdxRandom(true); }});
 			document.getElementById('pStart').addEventListener('click', startPractice);
 			document.getElementById('pReset').addEventListener('click', updatePracticeUI);
 			document.getElementById('pShow').addEventListener('click', showPracticeAnswer);
