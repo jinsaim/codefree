@@ -118,45 +118,20 @@
 
 		<!-- 쓰기 모드 -->
 		<section id="mode-write" class="mode">
-			<div class="panel">
-				<div class="row">
-					<label>한자</label>
-					<input id="wChar" maxlength="1" placeholder="例) 天" />
-				</div>
-				<div class="row">
-					<label>음/훈</label>
-					<input id="wRead" placeholder="例) 천/하늘" />
-				</div>
-				<div class="row">
-					<label>뜻/설명</label>
-					<textarea id="wMean" rows="2" placeholder="간단한 설명"></textarea>
-				</div>
-				<div class="row">
-					<label>묶음(행/절)</label>
-					<input id="wGroup" placeholder="例) 001 (1~4자)" />
-				</div>
-				<div style="margin-top:.5rem">
-					<button id="wAdd" class="primary">추가</button>
-				</div>
-			</div>
-
 			<!-- Handwriting practice within current group -->
 			<div class="panel" id="practicePanel">
 				<div style="display:flex; justify-content:space-between; align-items:center; gap:.75rem; flex-wrap:wrap;">
-					<div>
-						<div id="pChar" style="font-size:28px; font-weight:700;">天</div>
-						<div id="pRead" style="color: var(--muted);">천/하늘</div>
-					</div>
+					<div id="pRead" style="color: var(--muted); font-size:1rem;">천 / 하늘</div>
 					<div class="practice-controls" style="display:flex; gap:.5rem;">
 						<button id="pPrev">이전</button>
 						<button id="pNext">다음</button>
-						<button id="pStart" class="primary">쓰기 시작</button>
+						<button id="pStart" class="primary">쓰기 연습</button>
 						<button id="pReset">초기화</button>
-						<button id="pShow">정답보기</button>
+						<button id="pShow">다시 확인</button>
 					</div>
 				</div>
-				<div id="practiceTarget" style="width:320px;height:320px;margin:.75rem auto; background:#0b1020; border:1px dashed #334155; border-radius:.75rem;"></div>
-				<div id="pHint" class="hint" style="text-align:center; color:var(--muted);">현재 선택된 묶음의 글자를 연습합니다.</div>
+				<div id="practiceTarget" style="width:320px;height:320px;margin:.75rem auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:.75rem;"></div>
+				<div id="pHint" class="hint" style="text-align:center; color:var(--muted);">음/훈만 보고 흰 바탕에서 바로 써 보세요.</div>
 			</div>
 		</section>
 
@@ -245,6 +220,7 @@
 				const groupExplanations = {
 					'001': '하늘과 땅이 나뉘면서 빛깔이 거무스름하고 누리끼리해졌다.',
 					'002': '공간과 시간이 생기면서 큰 것과 거친 것이 만들어졌다.',
+					'003': '해와 달이 떠올라 차면 기울어진다.',
 				};
 				// Build map group -> items
 				const byGroup = new Map();
@@ -368,7 +344,6 @@
 
 		function updatePracticeUI(){
 			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
-			document.getElementById('pChar').textContent = cur ? cur.ch : '-';
 			document.getElementById('pRead').textContent = cur ? `${cur.read}${cur.mean? ' / '+cur.mean:''}` : '';
 			// Reset writer view
 			const target = document.getElementById('practiceTarget');
@@ -425,21 +400,7 @@
 		}
 
 		// 쓰기(추가)
-		function addItem() {
-			const ch = document.getElementById('wChar').value.trim();
-			const read = document.getElementById('wRead').value.trim();
-			const mean = document.getElementById('wMean').value.trim();
-			const group = document.getElementById('wGroup').value.trim() || 'custom';
-			if (!ch || !read) { alert('한자와 음/훈을 입력해주세요.'); return; }
-			data.push({ ch, read, mean, group });
-			saveData();
-			renderLearn();
-			alert('추가되었습니다.');
-			document.getElementById('wChar').value = '';
-			document.getElementById('wRead').value = '';
-			document.getElementById('wMean').value = '';
-			document.getElementById('wGroup').value = '';
-		}
+		// 기존 수기 추가 UI는 제거되었습니다.
 
 		// 백업/가져오기
 		function doExport() {
@@ -499,7 +460,7 @@
 			document.getElementById('quizNext').addEventListener('click', () => { quizIndex++; showQuiz(); });
 			document.getElementById('quizAnswer').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); checkQuiz(); } });
 
-			document.getElementById('wAdd').addEventListener('click', () => { addItem(); rebuildGroupFilter(); doSearch(); buildPracticeList(); });
+			// 쓰기 상단 입력 폼 제거로 인한 이벤트 제거
 
 			// 학습 카드 클릭 -> 필순 모달
 			const learnGrid = document.getElementById('learnGrid');
