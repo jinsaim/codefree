@@ -139,6 +139,25 @@
 					<button id="wAdd" class="primary">추가</button>
 				</div>
 			</div>
+
+			<!-- Handwriting practice within current group -->
+			<div class="panel" id="practicePanel">
+				<div style="display:flex; justify-content:space-between; align-items:center; gap:.75rem; flex-wrap:wrap;">
+					<div>
+						<div id="pChar" style="font-size:28px; font-weight:700;">天</div>
+						<div id="pRead" style="color: var(--muted);">천/하늘</div>
+					</div>
+					<div class="practice-controls" style="display:flex; gap:.5rem;">
+						<button id="pPrev">이전</button>
+						<button id="pNext">다음</button>
+						<button id="pStart" class="primary">쓰기 시작</button>
+						<button id="pReset">초기화</button>
+						<button id="pShow">정답보기</button>
+					</div>
+				</div>
+				<div id="practiceTarget" style="width:320px;height:320px;margin:.75rem auto; background:#0b1020; border:1px dashed #334155; border-radius:.75rem;"></div>
+				<div id="pHint" class="hint" style="text-align:center; color:var(--muted);">현재 선택된 묶음의 글자를 연습합니다.</div>
+			</div>
 		</section>
 
 	</div>
@@ -224,8 +243,8 @@
 			if (matchNum && !queryVal) {
 				// Group explanations (extend as needed)
 				const groupExplanations = {
-					'001': '하늘은 거뭇거뭇하고 땅은 누리끼리하다.',
-					'002': '우주는 집(공간)이고 주는 시공(시간)이다.',
+					'001': '하늘과 땅이 나뉘면서 빛깔이 거무스름하고 누리끼리해졌다.',
+					'002': '공간과 시간이 생기면서 큰 것과 거친 것이 만들어졌다.',
 				};
 				// Build map group -> items
 				const byGroup = new Map();
@@ -323,6 +342,68 @@
 			if (current && groups.includes(current)) sel.value = current;
 		}
 
+		// Practice (handwriting) helpers
+		let practiceList = [];
+		let practiceIdx = 0;
+		let practiceWriter = null;
+		function buildPracticeList(){
+			const grp = document.getElementById('groupFilter').value;
+			if (!grp) { practiceList = data.slice(0, 16); } // default: first few
+			else {
+				// If numeric, include all <= selected, else exact group
+				const m = String(grp).match(/^0*(\d+)$/);
+				if (m) {
+					const upTo = parseInt(m[1], 10);
+					practiceList = data.filter(x => {
+						const mm = String(x.group||'').match(/^0*(\d+)$/);
+						return mm && parseInt(mm[1],10) <= upTo;
+					});
+				} else {
+					practiceList = data.filter(x => (x.group||'') === grp);
+				}
+			}
+			practiceIdx = 0;
+			updatePracticeUI();
+		}
+
+		function updatePracticeUI(){
+			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
+			document.getElementById('pChar').textContent = cur ? cur.ch : '-';
+			document.getElementById('pRead').textContent = cur ? `${cur.read}${cur.mean? ' / '+cur.mean:''}` : '';
+			// Reset writer view
+			const target = document.getElementById('practiceTarget');
+			target.innerHTML = '';
+			practiceWriter = null;
+		}
+
+		function startPractice(){
+			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
+			if (!cur) return;
+			const target = document.getElementById('practiceTarget');
+			target.innerHTML = '';
+			practiceWriter = HanziWriter.create(target, cur.ch, {
+				width: 320, height: 320, padding: 12, showCharacter: false,
+				strokeColor: '#22c55e', radicalColor: '#ef4444',
+				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150,
+			});
+			practiceWriter.quiz({
+				showHintAfterMisses: 2,
+				onComplete: () => { /* optional: toast */ },
+			});
+		}
+
+		function showPracticeAnswer(){
+			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
+			if (!cur) return;
+			const target = document.getElementById('practiceTarget');
+			target.innerHTML = '';
+			practiceWriter = HanziWriter.create(target, cur.ch, {
+				width: 320, height: 320, padding: 12, showCharacter: true,
+				strokeColor: '#22c55e', radicalColor: '#ef4444',
+			});
+			practiceWriter.animateCharacter();
+		}
+
 		// 퀴즈
 		let quizIndex = 0;
 		let quizList = [];
@@ -399,7 +480,7 @@
 
 			document.getElementById('modeSelect').addEventListener('change', (e) => setMode(e.target.value));
 			document.getElementById('search').addEventListener('input', doSearch);
-			document.getElementById('groupFilter').addEventListener('change', doSearch);
+			document.getElementById('groupFilter').addEventListener('change', () => { doSearch(); buildPracticeList(); });
 			document.getElementById('shuffleBtn').addEventListener('click', () => { data = shuffle(data); saveData(); renderLearn(); startQuiz(); });
 			document.getElementById('resetBtn').addEventListener('click', doReset);
 			document.getElementById('exportBtn').addEventListener('click', doExport);
@@ -418,7 +499,7 @@
 			document.getElementById('quizNext').addEventListener('click', () => { quizIndex++; showQuiz(); });
 			document.getElementById('quizAnswer').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); checkQuiz(); } });
 
-			document.getElementById('wAdd').addEventListener('click', () => { addItem(); rebuildGroupFilter(); doSearch(); });
+			document.getElementById('wAdd').addEventListener('click', () => { addItem(); rebuildGroupFilter(); doSearch(); buildPracticeList(); });
 
 			// 학습 카드 클릭 -> 필순 모달
 			const learnGrid = document.getElementById('learnGrid');
@@ -469,6 +550,16 @@
 			strokeClose.addEventListener('click', closeStroke);
 			strokeReplay.addEventListener('click', () => { if (writer) writer.animateCharacter(); });
 			strokeModal.addEventListener('click', (e) => { if (e.target === strokeModal) closeStroke(); });
+
+			// practice control events
+			document.getElementById('pPrev').addEventListener('click', () => { if (practiceList.length) { practiceIdx = (practiceIdx - 1 + practiceList.length) % practiceList.length; updatePracticeUI(); }});
+			document.getElementById('pNext').addEventListener('click', () => { if (practiceList.length) { practiceIdx = (practiceIdx + 1) % practiceList.length; updatePracticeUI(); }});
+			document.getElementById('pStart').addEventListener('click', startPractice);
+			document.getElementById('pReset').addEventListener('click', updatePracticeUI);
+			document.getElementById('pShow').addEventListener('click', showPracticeAnswer);
+
+			// initialize practice list initially
+			buildPracticeList();
 		});
 
 		function handleBulk(mode){
