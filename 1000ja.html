@@ -70,7 +70,8 @@
 		/* Bulk import modal */
 		#bulkText { width: 100%; min-height: 180px; background: #0b1020; color: var(--text); border: 1px solid #1f2937; border-radius: .5rem; padding: .75rem; }
 	</style>
-    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@2.2/dist/hanzi-writer.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@2.2/dist/hanzi-writer.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 	<header>
@@ -92,7 +93,7 @@
 			<button id="resetBtn">초기화</button>
 			<button id="exportBtn">백업</button>
 			<button id="viewJsonBtn">JSON 보기</button>
-			<input id="importFile" type="file" accept="application/json" style="display:none" />
+			<input id="importFile" type="file" accept=".json,.xlsx,.xls,.csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" />
 			<button id="importBtn">가져오기</button>
 			<button id="bulkBtn" class="primary" title="천자문 전체를 빠르게 붙여넣기로 등록">전체 붙여넣기</button>
 			<span class="footer" id="countInfo"></span>
@@ -476,6 +477,43 @@
 			setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
 		}
 		function doImport(file) {
+			const name = (file.name || '').toLowerCase();
+			const isExcel = /\.(xlsx|xls)$/.test(name);
+			const isCsv = /\.(csv)$/.test(name);
+			if (isExcel || isCsv) {
+				const reader = new FileReader();
+				reader.onload = (e) => {
+					try {
+						const dataArray = new Uint8Array(e.target.result);
+						const wb = XLSX.read(dataArray, { type: 'array' });
+						const sheet = wb.Sheets[wb.SheetNames[0]];
+						// Prefer header-based parsing
+						let rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+						if (!rows.length) {
+							// Fallback: no headers, make rows from AOAs
+							rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+							rows = rows.map(r => ({ ch: r[0] || '', read: r[1] || '', mean: r[2] || '', group: r[3] || '' }));
+						}
+						const norm = rows.map(r => ({
+							ch: r.ch || r.char || r.hanja || r['한자'] || r['자'] || r['character'] || r['Character'] || r[0],
+							read: r.read || r.kor || r.ko || r['음'] || r['독음'] || r['음/훈'] || r['훈음'] || r['reading'] || r['Reading'] || r[1] || '',
+							mean: r.mean || r.desc || r['뜻'] || r['설명'] || r['훈'] || r['의미'] || r['meaning'] || r['Meaning'] || r[2] || '',
+							group: r.group || r.grp || r['묶음'] || r['그룹'] || r['group'] || r['Group'] || r[3] || 'import',
+						})).filter(x => x.ch && (x.read || x.mean));
+						if (!norm.length) throw new Error('엑셀/CSV에서 유효한 데이터가 없습니다. (열: 한자, 음/훈, 뜻, 묶음)');
+						data = norm;
+						saveData();
+						renderLearn();
+						rebuildGroupFilter();
+						alert(`불러오기 완료: ${data.length}자`);
+					} catch (err) {
+						alert('엑셀/CSV 가져오기 실패: ' + err.message);
+					}
+				};
+				if (isCsv) reader.readAsText(file, 'utf-8'); else reader.readAsArrayBuffer(file);
+				return;
+			}
+			// JSON path (existing)
 			const reader = new FileReader();
 			reader.onload = () => {
 				try {
@@ -487,6 +525,7 @@
 					data = items.map(x => ({ ch: x.ch || x.char || x.hanja, read: x.read || x.kor || x.ko || '', mean: x.mean || x.desc || '', group: x.group || x.grp || 'import' })).filter(x => x.ch && x.read);
 					saveData();
 					renderLearn();
+					rebuildGroupFilter();
 					alert(`불러오기 완료: ${data.length}자`);
 				} catch (e) {
 					alert('가져오기 실패: ' + e.message);
