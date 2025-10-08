@@ -31,7 +31,8 @@
 		/* Numeric group selected -> 4 columns per row */
 		.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 		/* Row of 4 cards + explanation to the right */
-		.quad-row { display: grid; grid-template-columns: repeat(4, 0.375fr) 1.5fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
+		/* 4 cards take 4/5 width, explanation 1/5 */
+		.quad-row { display: grid; grid-template-columns: repeat(4, 1fr) 1fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
 		.row-explain { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
 		@media (max-width: 640px) { .quad-row { grid-template-columns: repeat(2, 1fr); } .row-explain { grid-column: 1 / -1; } }
 		.card { background: #0b1220; border: 1px solid #1f2937; border-radius: .75rem; padding: .75rem; text-align: center; transition: transform .12s ease, border-color .12s ease; }
@@ -59,6 +60,12 @@
 		.tips-box { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
 		.tips-box ul { margin: .25rem 0 0; padding-left: 1.1rem; }
 		.tips-box li { margin: .15rem 0; }
+
+		/* Explanation editor */
+		.explain-view { white-space: pre-wrap; word-break: break-word; }
+		.explain-input { width: 100%; min-height: 70px; margin-top: .4rem; background: #0b1020; color: var(--text); border: 1px solid #1f2937; border-radius: .5rem; padding: .5rem .6rem; display: none; }
+		.explain-actions { display: flex; gap: .4rem; margin-top: .4rem; }
+		.saved-badge { color: #22c55e; font-size: .8rem; margin-left: .25rem; display: none; }
 
 		/* Stroke-order modal */
 		.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 50; }
@@ -251,14 +258,12 @@
 			const queryVal = (document.getElementById('search')?.value || '').trim();
 			const matchNum = grpVal.match(/^0*(\d+)$/);
 
-			// If numeric group selected and no query, render rows of 4 + explanation
+			// If numeric group selected and no query, render rows of 4 + editable explanation
 			if (matchNum && !queryVal) {
-				// Group explanations (extend as needed)
-				const groupExplanations = {
-					'001': '하늘과 땅이 나뉘면서 빛깔이 거무스름하고 누리끼리해졌다.',
-					'002': '공간과 시간이 생기면서 큰 것과 거친 것이 만들어졌다.',
-					'003': '해와 달이 떠올라 차면 기울어진다.',
-				};
+				// Load saved explanations per group
+				const explainMap = (() => {
+					try { return JSON.parse(localStorage.getItem('thousandChars_explain') || '{}'); } catch { return {}; }
+				})();
 				// Build map group -> items
 				const byGroup = new Map();
 				currentList.forEach((x) => {
@@ -280,11 +285,50 @@
 							<div class="hangeul">${hint}</div>
 						</div>`;
 					}).join('');
-					const base = groupExplanations[g] || '';
-					return `<div class="quad-row">${cards}<div class="row-explain">${base}</div></div>`;
+					const key = String(g);
+					const saved = explainMap[key] || '';
+					return `
+					<div class="quad-row">
+						${cards}
+						<div class="row-explain" data-group="${key}">
+							<div class="explain-view">${saved ? saved.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''}</div>
+							<textarea class="explain-input" placeholder="풀이를 입력하세요"></textarea>
+							<div class="explain-actions">
+								<button class="btn" data-action="edit">풀이 쓰기</button>
+								<button class="btn primary" data-action="save">저장</button>
+								<span class="saved-badge">저장됨</span>
+							</div>
+						</div>
+					</div>`;
 				}).join('');
 				el.innerHTML = rowsHtml;
 				document.getElementById('countInfo').textContent = `${currentList.length}자`;
+				// Wire explanation edit/save
+				el.querySelectorAll('.row-explain').forEach(box => {
+					const key = box.getAttribute('data-group');
+					const view = box.querySelector('.explain-view');
+					const input = box.querySelector('.explain-input');
+					const savedBadge = box.querySelector('.saved-badge');
+					const btnEdit = box.querySelector('[data-action="edit"]');
+					const btnSave = box.querySelector('[data-action="save"]');
+					btnEdit.addEventListener('click', () => {
+						input.value = view.textContent || '';
+						view.style.display = 'none';
+						input.style.display = 'block';
+						input.focus();
+						savedBadge.style.display = 'none';
+					});
+					btnSave.addEventListener('click', () => {
+						const map = (() => { try { return JSON.parse(localStorage.getItem('thousandChars_explain') || '{}'); } catch { return {}; }})();
+						map[key] = input.value.trim();
+						try { localStorage.setItem('thousandChars_explain', JSON.stringify(map)); } catch {}
+						view.textContent = map[key] || '';
+						input.style.display = 'none';
+						view.style.display = '';
+						savedBadge.style.display = 'inline';
+						setTimeout(() => { savedBadge.style.display = 'none'; }, 1500);
+					});
+				});
 				return;
 			}
 
