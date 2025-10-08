@@ -192,14 +192,38 @@
 		const LS_LAST_IMPORT_KEY = 'thousandChars_lastImport';
 		let data = [];
 
-		function loadData() {
+		async function loadData() {
+			// 1) Try localStorage first
 			try {
 				const raw = localStorage.getItem(LS_KEY);
-				data = raw ? JSON.parse(raw) : seed;
+				if (raw) { data = JSON.parse(raw); return; }
 			} catch (e) {
-				console.warn('localStorage 읽기 실패, seed 사용', e);
-				data = seed;
+				console.warn('localStorage 읽기 실패', e);
 			}
+			// 2) If no local data, try fetching the bundled dataset
+			try {
+				const res = await fetch('thousandChars_v1.json', { cache: 'no-store' });
+				if (res && res.ok) {
+					const json = await res.json();
+					const items = Array.isArray(json) ? json : (json.items || json.data || []);
+					if (Array.isArray(items) && items.length) {
+						data = items.map(x => ({
+							ch: x.ch || x.char || x.hanja,
+							read: x.read || x.kor || x.ko || '',
+							mean: x.mean || x.desc || '',
+							group: x.group || x.grp || 'import',
+						})).filter(x => x.ch && (x.read || x.mean));
+						// Save as the current dataset for subsequent visits
+						try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
+						try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
+						return;
+					}
+				}
+			} catch (e) {
+				console.warn('외부 데이터 로드 실패', e);
+			}
+			// 3) Fallback to seed
+			data = seed;
 		}
 
 		function saveData() { try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (e) { console.warn('저장 실패', e); } }
@@ -607,8 +631,8 @@
 		}
 
 		// 이벤트 바인딩
-			document.addEventListener('DOMContentLoaded', () => {
-			loadData();
+			document.addEventListener('DOMContentLoaded', async () => {
+				await loadData();
 			renderLearn();
 			rebuildGroupFilter();
 			startQuiz();
