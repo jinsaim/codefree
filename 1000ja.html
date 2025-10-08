@@ -204,6 +204,22 @@
 
 		function saveData() { try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (e) { console.warn('저장 실패', e); } }
 
+		// Normalize compatibility ideographs to unified forms for HanziWriter
+		function normalizeHanChar(ch){
+			if (!ch) return ch;
+			try {
+				const nfkc = ch.normalize ? ch.normalize('NFKC') : ch;
+				// Explicit mappings for common Korean compatibility forms
+				const map = {
+					'\uF961': '\u7387', // 率 -> 率
+					'\uF978': '\u5F8B', // 律 -> 律
+				};
+				return map[nfkc] ? map[nfkc] : nfkc;
+			} catch {
+				return ch;
+			}
+		}
+
 		function setMode(mode) {
 			document.querySelectorAll('.mode').forEach(el => el.classList.remove('active'));
 			document.getElementById('mode-' + mode).classList.add('active');
@@ -421,7 +437,8 @@
 			if (!cur) return;
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
-			practiceWriter = HanziWriter.create(target, cur.ch, {
+			const baseCh = normalizeHanChar(cur.ch);
+			practiceWriter = HanziWriter.create(target, baseCh, {
 				width: 320, height: 320, padding: 12, showCharacter: false,
 				strokeColor: '#22c55e', radicalColor: '#ef4444',
 				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150,
@@ -437,7 +454,8 @@
 			if (!cur) return;
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
-			practiceWriter = HanziWriter.create(target, cur.ch, {
+			const baseCh = normalizeHanChar(cur.ch);
+			practiceWriter = HanziWriter.create(target, baseCh, {
 				width: 320, height: 320, padding: 12, showCharacter: true,
 				strokeColor: '#22c55e', radicalColor: '#ef4444',
 			});
@@ -630,13 +648,14 @@
 
 			function openStroke(ch, read, mean){
 				// 모달 표시
-				strokeTitle.textContent = `필순: ${ch}`;
+				const baseCh = normalizeHanChar(ch);
+				strokeTitle.textContent = `필순: ${baseCh}`;
 				strokeMeta.textContent = [read||'', mean||''].filter(Boolean).join(' · ');
 				strokeTarget.innerHTML = '';
 				strokeModal.classList.add('show');
 				// Hanzi Writer 생성
 				try {
-					writer = HanziWriter.create(strokeTarget, ch, {
+					writer = HanziWriter.create(strokeTarget, baseCh, {
 						width: 280,
 						height: 280,
 						padding: 12,
