@@ -212,7 +212,8 @@
 							read: x.read || x.kor || x.ko || '',
 							mean: x.mean || x.desc || '',
 							group: x.group || x.grp || 'import',
-						})).filter(x => x.ch && (x.read || x.mean));
+						}))
+						.filter(x => x.ch);
 						// Save as the current dataset for subsequent visits
 						try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
 						try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
@@ -503,12 +504,20 @@
 			} else if (grp) {
 				list = data.filter(x => (x.group || '') === grp);
 			}
-			quizList = shuffle(list.length ? list : data);
+			const candidates = (list.length ? list : data).filter(x => (x.read || x.mean));
+			quizList = shuffle(candidates);
 			quizIndex = 0;
 			showQuiz();
 		}
 		function showQuiz() {
-			if (!quizList.length) { startQuiz(); return; }
+			if (!quizList.length) {
+				document.getElementById('quizQuestion').textContent = '-';
+				document.getElementById('quizAnswer').value = '';
+				const r = document.getElementById('quizResult');
+				r.textContent = '퀴즈할 항목이 없습니다 (음/뜻이 있는 항목 없음)';
+				r.className = 'result';
+				return;
+			}
 			const q = quizList[quizIndex % quizList.length];
 			document.getElementById('quizQuestion').textContent = q.ch;
 			document.getElementById('quizAnswer').value = '';
@@ -572,7 +581,8 @@
 							read: r.read || r.kor || r.ko || r['음'] || r['독음'] || r['음/훈'] || r['훈음'] || r['reading'] || r['Reading'] || r[1] || '',
 							mean: r.mean || r.desc || r['뜻'] || r['설명'] || r['훈'] || r['의미'] || r['meaning'] || r['Meaning'] || r[2] || '',
 							group: r.group || r.grp || r['묶음'] || r['그룹'] || r['group'] || r['Group'] || r[3] || 'import',
-						})).filter(x => x.ch && (x.read || x.mean));
+						}))
+						.filter(x => x.ch);
 						if (!norm.length) throw new Error('엑셀/CSV에서 유효한 데이터가 없습니다. (열: 한자, 음/훈, 뜻, 묶음)');
 						data = norm;
 						try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
@@ -596,7 +606,8 @@
 					const items = Array.isArray(json) ? json : (json.items || json.data || []);
 					if (!Array.isArray(items)) throw new Error('잘못된 형식');
 					// 기본 키 정규화
-					data = items.map(x => ({ ch: x.ch || x.char || x.hanja, read: x.read || x.kor || x.ko || '', mean: x.mean || x.desc || '', group: x.group || x.grp || 'import' })).filter(x => x.ch && x.read);
+										data = items.map(x => ({ ch: x.ch || x.char || x.hanja, read: x.read || x.kor || x.ko || '', mean: x.mean || x.desc || '', group: x.group || x.grp || 'import' }))
+											.filter(x => x.ch);
 					try { localStorage.setItem(LS_LAST_IMPORT_KEY, JSON.stringify(data)); } catch {}
 					saveData();
 					renderLearn();
