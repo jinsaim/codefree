@@ -54,6 +54,12 @@
 		.bad { color: var(--danger); }
 		.footer { color: var(--muted); font-size: .85rem; margin-top: 1rem; text-align: right; }
 
+		/* Tips panel */
+		.tips { margin-top: .75rem; }
+		.tips-box { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
+		.tips-box ul { margin: .25rem 0 0; padding-left: 1.1rem; }
+		.tips-box li { margin: .15rem 0; }
+
 		/* Stroke-order modal */
 		.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 50; }
 		.modal.show { display: flex; }
@@ -94,6 +100,14 @@
 			<input id="importFile" type="file" accept=".json,.xlsx,.xls,.csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="display:none" />
 			<button id="importBtn">가져오기</button>
 			<span class="footer" id="countInfo"></span>
+		</div>
+		<div class="tips">
+			<div class="tips-box" role="note" aria-label="사용 안내">
+				<ul>
+					<li>묶음 숫자는 한자를 4자씩 보게 해줘요.</li>
+					<li>한자 카드를 클릭하면 필순을 볼 수 있어요.</li>
+				</ul>
+			</div>
 		</div>
 
 		<!-- 학습 모드 -->
