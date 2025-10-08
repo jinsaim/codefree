@@ -33,7 +33,7 @@
 		/* Row of 4 cards + explanation to the right */
 	/* 4 cards take 1/3 width, explanation 2/3 */
 	.quad-row { display: grid; grid-template-columns: 1fr 2fr; gap: .75rem; align-items: stretch; margin-bottom: .75rem; }
-	.quad-row .cards-wrap { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+	.quad-row .cards-wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
 		.row-explain { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
 	@media (max-width: 640px) { .quad-row { grid-template-columns: 1fr; } .row-explain { grid-column: 1 / -1; } }
 		.card { background: #0b1220; border: 1px solid #1f2937; border-radius: .75rem; padding: .75rem; text-align: center; transition: transform .12s ease, border-color .12s ease; }
@@ -64,7 +64,7 @@
 
 		/* Explanation editor */
 		.explain-view { white-space: pre-wrap; word-break: break-word; }
-		.explain-input { width: 100%; min-height: 70px; margin-top: .4rem; background: #0b1020; color: var(--text); border: 1px solid #1f2937; border-radius: .5rem; padding: .5rem .6rem; display: none; }
+	.explain-input { width: 100%; height: 36px; margin-top: .35rem; background: #0b1020; color: var(--text); border: 1px solid #1f2937; border-radius: .5rem; padding: .35rem .5rem; display: none; }
 	.explain-actions { display: flex; gap: .35rem; margin-top: .4rem; }
 	.explain-actions .btn { padding: .35rem .55rem; font-size: .85rem; }
 		.saved-badge { color: #22c55e; font-size: .8rem; margin-left: .25rem; display: none; }
@@ -294,7 +294,7 @@
 						<div class="cards-wrap">${cards}</div>
 						<div class="row-explain" data-group="${key}">
 							<div class="explain-view">${saved ? saved.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''}</div>
-							<textarea class="explain-input" placeholder="풀이를 입력하세요"></textarea>
+							<input type="text" class="explain-input" placeholder="4글자의 뜻을 풀어서 입력하세요" />
 							<div class="explain-actions">
 								<button class="btn" data-action="edit">풀이 쓰기</button>
 								<button class="btn primary" data-action="save">저장</button>
