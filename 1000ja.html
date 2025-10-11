@@ -262,12 +262,60 @@
 		}
 
 		// 부수 색 분리를 위한 radStrokes 보강 맵(선택)
-		// 특정 글자의 radStrokes 인덱스를 아시는 경우 여기에 등록하면 색 분리까지 가능
-		// 예) '律': [0,1,2]  // 예시(실제 인덱스는 글자 데이터에 따라 다름)
 		const radicalStrokeIndices = {
 			// '律': [/* stroke indexes for radical */],
 			// '率': [/* ... */],
 		};
+
+		// SVG bbox를 이용해 stroke 경계 계산
+		function getStrokeBBoxes(charData) {
+			const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+			svg.setAttribute('viewBox', '0 0 1024 1024');
+			svg.style.position = 'absolute';
+			svg.style.width = '0';
+			svg.style.height = '0';
+			document.body.appendChild(svg);
+			const bboxes = [];
+			for (const d of (charData.strokes || [])) {
+				const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+				p.setAttribute('d', d);
+				svg.appendChild(p);
+				const b = p.getBBox();
+				bboxes.push({ x: b.x, y: b.y, width: b.width, height: b.height });
+				p.remove();
+			}
+			svg.remove();
+			return bboxes;
+		}
+		// 상단 영역(예: 艹) 부수 추론
+		function inferTopRadicalStrokes(charData, cutoffY = 360) {
+			const boxes = getStrokeBBoxes(charData);
+			return boxes.map((b, i) => ((b.y + b.height) <= cutoffY ? i : -1)).filter(i => i >= 0);
+		}
+		// 좌측 영역(예: 氵) 부수 추론
+		function inferLeftRadicalStrokes(charData, cutoffX = 340) {
+			const boxes = getStrokeBBoxes(charData);
+			return boxes.map((b, i) => ((b.x + b.width) <= cutoffX ? i : -1)).filter(i => i >= 0);
+		}
+		// 부수 추론/보강
+		function tryAugmentRadStrokes(charData, ch) {
+			if (charData.radStrokes && charData.radStrokes.length) return charData;
+			const meta = getRadicalMeta(ch);
+			if (!meta) return charData;
+			let idxs = [];
+			switch (meta.radical) {
+				case '艹': // 荒, 荷, 花 등
+					idxs = inferTopRadicalStrokes(charData, 360);
+					break;
+				case '氵': // 洪 등
+					idxs = inferLeftRadicalStrokes(charData, 340);
+					break;
+				default:
+					idxs = radicalStrokeIndices[ch] || [];
+			}
+			if (idxs && idxs.length) charData.radStrokes = idxs;
+			return charData;
+		}
 
 		// Hanzi Writer용 charData를 CDN에서 받아와 결손(radStrokes) 시 보강
 		async function fetchCharData(ch) {
@@ -275,9 +323,11 @@
 			const res = await fetch(url);
 			if (!res.ok) throw new Error('charData fetch failed');
 			const d = await res.json();
+			// 기존 수동 매핑 우선, 실패 시 메타 기반 추론(특히 荒: 艹)
 			if ((!d.radStrokes || d.radStrokes.length === 0) && radicalStrokeIndices[ch]) {
 				d.radStrokes = radicalStrokeIndices[ch];
 			}
+			tryAugmentRadStrokes(d, ch);
 			return d;
 		}
 
