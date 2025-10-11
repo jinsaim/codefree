@@ -58,7 +58,7 @@
 
 		/* Tips panel */
 		.tips { margin-top: .75rem; }
-		.tips-box { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: 1.5; }
+		.tips-box { background: #0b1220; border: 1px dashed #334155; color: var(--muted); border-radius: .5rem; padding: .6rem .7rem; font-size: .9rem; line-height: .95; }
 		.tips-box ul { margin: .25rem 0 0; padding-left: 1.1rem; }
 		.tips-box li { margin: .15rem 0; }
 
@@ -246,6 +246,39 @@
 			} catch {
 				return ch;
 			}
+		}
+
+		// 부수 보완용 메타(라벨) 맵: 부족한 글자라도 레이블은 보여줌
+		// kangxi: 강희 부수 번호, radical: 부수 글자, name: 한국식 명칭
+		const radicalMetaMap = {
+			'律': { kangxi: 60, radical: '彳', name: '두인변' },
+			'率': { kangxi: 95, radical: '玄', name: '현' },
+			'洪': { kangxi: 85, radical: '氵', name: '삼수변' },
+			'荒': { kangxi: 140, radical: '艹', name: '초두머리' },
+			// 필요 시 계속 보강 가능
+		};
+		function getRadicalMeta(ch) {
+			return radicalMetaMap[ch] || null;
+		}
+
+		// 부수 색 분리를 위한 radStrokes 보강 맵(선택)
+		// 특정 글자의 radStrokes 인덱스를 아시는 경우 여기에 등록하면 색 분리까지 가능
+		// 예) '律': [0,1,2]  // 예시(실제 인덱스는 글자 데이터에 따라 다름)
+		const radicalStrokeIndices = {
+			// '律': [/* stroke indexes for radical */],
+			// '率': [/* ... */],
+		};
+
+		// Hanzi Writer용 charData를 CDN에서 받아와 결손(radStrokes) 시 보강
+		async function fetchCharData(ch) {
+			const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(ch)}.json`;
+			const res = await fetch(url);
+			if (!res.ok) throw new Error('charData fetch failed');
+			const d = await res.json();
+			if ((!d.radStrokes || d.radStrokes.length === 0) && radicalStrokeIndices[ch]) {
+				d.radStrokes = radicalStrokeIndices[ch];
+			}
+			return d;
 		}
 
 		function setMode(mode) {
@@ -497,33 +530,39 @@
 			initFreehandCanvas();
 		}
 
-		function startPractice(){
+		async function startPractice(){
 			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
 			if (!cur) return;
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
 			const baseCh = normalizeHanChar(cur.ch);
-			practiceWriter = HanziWriter.create(target, baseCh, {
-				width: 320, height: 320, padding: 12, showCharacter: false,
+			let opts = { width: 320, height: 320, padding: 12, showCharacter: false,
 				strokeColor: '#22c55e', radicalColor: '#ef4444',
-				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150,
-			});
+				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150 };
+			try {
+				const cd = await fetchCharData(baseCh);
+				opts = { ...opts, charData: cd };
+			} catch {}
+			practiceWriter = HanziWriter.create(target, baseCh, opts);
 			practiceWriter.quiz({
 				showHintAfterMisses: 2,
 				onComplete: () => { /* optional: toast */ },
 			});
 		}
 
-		function showPracticeAnswer(){
+		async function showPracticeAnswer(){
 			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
 			if (!cur) return;
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
 			const baseCh = normalizeHanChar(cur.ch);
-			practiceWriter = HanziWriter.create(target, baseCh, {
-				width: 320, height: 320, padding: 12, showCharacter: true,
-				strokeColor: '#22c55e', radicalColor: '#ef4444',
-			});
+			let opts = { width: 320, height: 320, padding: 12, showCharacter: true,
+				strokeColor: '#22c55e', radicalColor: '#ef4444' };
+			try {
+				const cd = await fetchCharData(baseCh);
+				opts = { ...opts, charData: cd };
+			} catch {}
+			practiceWriter = HanziWriter.create(target, baseCh, opts);
 			practiceWriter.animateCharacter();
 		}
 
@@ -724,27 +763,44 @@
 				strokeModal.classList.add('show');
 				// Hanzi Writer 생성
 				try {
-					writer = HanziWriter.create(strokeTarget, baseCh, {
-						width: 280,
-						height: 280,
-						padding: 12,
-						showCharacter: false,
-						strokeColor: '#22c55e',
-						radicalColor: '#ef4444',
-						strokeAnimationSpeed: 1.2,
-						delayBetweenStrokes: 150,
-					});
-					writer.animateCharacter();
-				} catch (e) {
-					strokeTarget.innerHTML = '<div style="padding:1rem; color:#f87171;">이 글자의 필순 데이터를 찾지 못했습니다.</div>';
-				}
-			}
+					// charData를 직접 불러와(결손 보강 포함) 전달
+					(async () => {
+						let extraMeta = '';
+						try {
+							const cd = await fetchCharData(baseCh);
+							writer = HanziWriter.create(strokeTarget, baseCh, {
+								width: 280, height: 280, padding: 12, showCharacter: false,
+								strokeColor: '#22c55e', radicalColor: '#ef4444',
+								strokeAnimationSpeed: 1.2, delayBetweenStrokes: 150,
+								charData: cd,
+							});
+							writer.animateCharacter();
+						} catch(e) {
+							// charData 로드 실패 시 기본 생성으로 폴백
+							writer = HanziWriter.create(strokeTarget, baseCh, {
+								width: 280, height: 280, padding: 12, showCharacter: false,
+								strokeColor: '#22c55e', radicalColor: '#ef4444',
+							});
+							writer.animateCharacter();
+						}
+						// 부수 라벨 보완(색 분리 불가 시에도 텍스트로 안내)
+						const meta = getRadicalMeta(baseCh);
+						if (meta) {
+							const label = `부수: ${meta.radical}${meta.name ? ' ('+meta.name+')' : ''}${meta.kangxi ? ' · 강희 '+meta.kangxi : ''}`;
+							const parts = [read||'', mean||'', label].filter(Boolean);
+							strokeMeta.textContent = parts.join(' · ');
+						}
+					})();
+                } catch (e) {
+                    strokeTarget.innerHTML = '<div style="padding:1rem; color:#f87171;">이 글자의 필순 데이터를 찾지 못했습니다.</div>';
+                }
+            }
 
-			function closeStroke(){
-				strokeModal.classList.remove('show');
-			}
+            function closeStroke(){
+                strokeModal.classList.remove('show');
+            }
 
-			learnGrid.addEventListener('click', (ev) => {
+            learnGrid.addEventListener('click', (ev) => {
 				const card = ev.target.closest('.card');
 				if (!card) return;
 				const idx = Number(card.getAttribute('data-idx'));
