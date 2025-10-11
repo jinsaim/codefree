@@ -299,37 +299,92 @@
 		}
 		// 부수 추론/보강
 		function tryAugmentRadStrokes(charData, ch) {
-			if (charData.radStrokes && charData.radStrokes.length) return charData;
-			const meta = getRadicalMeta(ch);
-			if (!meta) return charData;
-			let idxs = [];
-			switch (meta.radical) {
-				case '艹': // 荒, 荷, 花 등
-					idxs = inferTopRadicalStrokes(charData, 360);
-					break;
-				case '氵': // 洪 등
-					idxs = inferLeftRadicalStrokes(charData, 340);
-					break;
-				default:
-					idxs = radicalStrokeIndices[ch] || [];
-			}
-			if (idxs && idxs.length) charData.radStrokes = idxs;
-			return charData;
-		}
+            if (charData.radStrokes && charData.radStrokes.length) return charData;
+            const meta = getRadicalMeta(ch);
+            if (!meta) return charData;
+            let idxs = [];
+            switch (meta.radical) {
+                case '艹': // 荒, 荷, 花 등
+                    idxs = inferTopRadicalStrokes(charData, 360);
+                    break;
+                case '氵': // 洪 등
+                    idxs = inferLeftRadicalStrokes(charData, 340);
+                    break;
+                default:
+                    idxs = radicalStrokeIndices[ch] || [];
+            }
+            if (idxs && idxs.length) charData.radStrokes = idxs;
+            return charData;
+        }
 
-		// Hanzi Writer용 charData를 CDN에서 받아와 결손(radStrokes) 시 보강
-		async function fetchCharData(ch) {
-			const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(ch)}.json`;
-			const res = await fetch(url);
-			if (!res.ok) throw new Error('charData fetch failed');
-			const d = await res.json();
-			// 기존 수동 매핑 우선, 실패 시 메타 기반 추론(특히 荒: 艹)
-			if ((!d.radStrokes || d.radStrokes.length === 0) && radicalStrokeIndices[ch]) {
-				d.radStrokes = radicalStrokeIndices[ch];
-			}
-			tryAugmentRadStrokes(d, ch);
-			return d;
-		}
+        // 부수 위치가 상단/좌측인지 검증 후, 잘못된 경우 교정(특히 荒: 艹 상단)
+        function validateAndFixRadStrokes(charData, ch) {
+            const meta = getRadicalMeta(ch);
+            if (!meta) return charData;
+
+            const boxes = getStrokeBBoxes(charData);
+            if (!boxes.length) return charData;
+
+            const minY = Math.min(...boxes.map(b => b.y));
+            const maxY = Math.max(...boxes.map(b => b.y + b.height));
+            const minX = Math.min(...boxes.map(b => b.x));
+            const maxX = Math.max(...boxes.map(b => b.x + b.width));
+
+            // top/left 판정 기준선(도형 범위의 45%)
+            const cutY = minY + (maxY - minY) * 0.45;
+            const cutX = minX + (maxX - minX) * 0.45;
+
+            const hasRad = Array.isArray(charData.radStrokes) && charData.radStrokes.length > 0;
+
+            if (!hasRad) {
+                // 없으면 기존 보강 로직 사용
+                return tryAugmentRadStrokes(charData, ch);
+            }
+
+            // 기존 radStrokes가 있을 때 위치 검증
+            const centersY = charData.radStrokes
+                .map(i => boxes[i])
+                .filter(Boolean)
+                .map(b => b.y + b.height / 2);
+            const centersX = charData.radStrokes
+                .map(i => boxes[i])
+                .filter(Boolean)
+                .map(b => b.x + b.width / 2);
+
+            const avgY = centersY.length ? centersY.reduce((a, v) => a + v, 0) / centersY.length : Infinity;
+            const avgX = centersX.length ? centersX.reduce((a, v) => a + v, 0) / centersX.length : Infinity;
+
+            if (meta.radical === '艹') {
+                // 부수는 상단에 있어야 함. 평균 Y가 cutY보다 크면(아래쪽이면) 교정
+                if (!(avgY <= cutY)) {
+                    const idxs = inferTopRadicalStrokes(charData, cutY);
+                    if (idxs.length) charData.radStrokes = idxs;
+                }
+            } else if (meta.radical === '氵') {
+                // 부수는 좌측에 있어야 함. 평균 X가 cutX보다 크면(우측이면) 교정
+                if (!(avgX <= cutX)) {
+                    const idxs = inferLeftRadicalStrokes(charData, cutX);
+                    if (idxs.length) charData.radStrokes = idxs;
+                }
+            }
+            return charData;
+        }
+
+        // Hanzi Writer용 charData를 CDN에서 받아와 결손/오표시 시 보강/교정
+        async function fetchCharData(ch) {
+            const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(ch)}.json`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('charData fetch failed');
+            const d = await res.json();
+            // 수동 매핑 우선
+            if ((!d.radStrokes || d.radStrokes.length === 0) && radicalStrokeIndices[ch]) {
+                d.radStrokes = radicalStrokeIndices[ch];
+            }
+            // 부수 자동 보강/검증 교정
+            tryAugmentRadStrokes(d, ch);
+            validateAndFixRadStrokes(d, ch);
+            return d;
+        }
 
 		function setMode(mode) {
 			document.querySelectorAll('.mode').forEach(el => el.classList.remove('active'));
