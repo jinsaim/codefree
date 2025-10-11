@@ -586,33 +586,28 @@
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
 			const baseCh = normalizeHanChar(cur.ch);
-			let opts = { width: 320, height: 320, padding: 12, showCharacter: false,
+			practiceWriter = HanziWriter.create(target, baseCh, {
+				width: 320, height: 320, padding: 12, showCharacter: false,
 				strokeColor: '#22c55e', radicalColor: '#ef4444',
-				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150 };
-			try {
-				const cd = await fetchCharData(baseCh);
-				opts = { ...opts, charData: cd };
-			} catch {}
-			practiceWriter = HanziWriter.create(target, baseCh, opts);
+				strokeAnimationSpeed: 1.1, delayBetweenStrokes: 150,
+				charDataLoader: () => fetchCharData(baseCh),
+			});
 			practiceWriter.quiz({
 				showHintAfterMisses: 2,
 				onComplete: () => { /* optional: toast */ },
 			});
 		}
-
 		async function showPracticeAnswer(){
 			const cur = practiceList[practiceIdx % Math.max(practiceList.length,1)];
 			if (!cur) return;
 			const target = document.getElementById('practiceTarget');
 			target.innerHTML = '';
 			const baseCh = normalizeHanChar(cur.ch);
-			let opts = { width: 320, height: 320, padding: 12, showCharacter: true,
-				strokeColor: '#22c55e', radicalColor: '#ef4444' };
-			try {
-				const cd = await fetchCharData(baseCh);
-				opts = { ...opts, charData: cd };
-			} catch {}
-			practiceWriter = HanziWriter.create(target, baseCh, opts);
+			practiceWriter = HanziWriter.create(target, baseCh, {
+				width: 320, height: 320, padding: 12, showCharacter: true,
+				strokeColor: '#22c55e', radicalColor: '#ef4444',
+				charDataLoader: () => fetchCharData(baseCh),
+			});
 			practiceWriter.animateCharacter();
 		}
 
@@ -805,46 +800,31 @@
 			let writer = null;
 
 			function openStroke(ch, read, mean){
-				// 모달 표시
 				const baseCh = normalizeHanChar(ch);
 				strokeTitle.textContent = `필순: ${baseCh}`;
 				strokeMeta.textContent = [read||'', mean||''].filter(Boolean).join(' · ');
 				strokeTarget.innerHTML = '';
 				strokeModal.classList.add('show');
-				// Hanzi Writer 생성
 				try {
-					// charData를 직접 불러와(결손 보강 포함) 전달
-					(async () => {
-						let extraMeta = '';
-						try {
-							const cd = await fetchCharData(baseCh);
-							writer = HanziWriter.create(strokeTarget, baseCh, {
-								width: 280, height: 280, padding: 12, showCharacter: false,
-								strokeColor: '#22c55e', radicalColor: '#ef4444',
-								strokeAnimationSpeed: 1.2, delayBetweenStrokes: 150,
-								charData: cd,
-							});
-							writer.animateCharacter();
-						} catch(e) {
-							// charData 로드 실패 시 기본 생성으로 폴백
-							writer = HanziWriter.create(strokeTarget, baseCh, {
-								width: 280, height: 280, padding: 12, showCharacter: false,
-								strokeColor: '#22c55e', radicalColor: '#ef4444',
-							});
-							writer.animateCharacter();
-						}
-						// 부수 라벨 보완(색 분리 불가 시에도 텍스트로 안내)
-						const meta = getRadicalMeta(baseCh);
-						if (meta) {
-							const label = `부수: ${meta.radical}${meta.name ? ' ('+meta.name+')' : ''}${meta.kangxi ? ' · 강희 '+meta.kangxi : ''}`;
-							const parts = [read||'', mean||'', label].filter(Boolean);
-							strokeMeta.textContent = parts.join(' · ');
-						}
-					})();
-                } catch (e) {
-                    strokeTarget.innerHTML = '<div style="padding:1rem; color:#f87171;">이 글자의 필순 데이터를 찾지 못했습니다.</div>';
-                }
-            }
+					writer = HanziWriter.create(strokeTarget, baseCh, {
+						width: 280, height: 280, padding: 12, showCharacter: false,
+						strokeColor: '#22c55e', radicalColor: '#ef4444',
+						strokeAnimationSpeed: 1.2, delayBetweenStrokes: 150,
+						// 핵심: 보강된 charData를 로더로 공급
+						charDataLoader: () => fetchCharData(baseCh),
+					});
+					writer.animateCharacter();
+					// 부수 라벨(텍스트) 보완
+					const meta = getRadicalMeta(baseCh);
+					if (meta) {
+						const label = `부수: ${meta.radical}${meta.name ? ' ('+meta.name+')' : ''}${meta.kangxi ? ' · 강희 '+meta.kangxi : ''}`;
+						const parts = [read||'', mean||'', label].filter(Boolean);
+						strokeMeta.textContent = parts.join(' · ');
+					}
+				} catch (e) {
+					strokeTarget.innerHTML = '<div style="padding:1rem; color:#f87171;">이 글자의 필순 데이터를 찾지 못했습니다.</div>';
+				}
+			}
 
             function closeStroke(){
                 strokeModal.classList.remove('show');
